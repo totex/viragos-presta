@@ -9,39 +9,46 @@
 {/if}
 
 {block name='checkout_steps'}
+  {$stepNumber = 1}
   <div class="{$componentName} {if $hasNotifications} {$componentName}--has-notifications{/if}">
     <div class="{$componentName}__desktop">
       <ul class="{$componentName}__list" role="tablist">
-        {include file='checkout/_partials/checkout-navigation-step.tpl'
-          number="{l s='1' d='Shop.Theme.Checkout'}"
-          step="checkout-personal-information-step"
-          title="{l s='Personal Information' d='Shop.Theme.Checkout'}"
-        }
+        {if !$viragos_skip_guest_personal_information}
+          {include file='checkout/_partials/checkout-navigation-step.tpl'
+            number=$stepNumber
+            step="checkout-personal-information-step"
+            title="{l s='Personal Information' d='Shop.Theme.Checkout'}"
+          }
+          {$stepNumber = $stepNumber + 1}
+        {/if}
 
         {if !$cart.is_virtual}
           {include file='checkout/_partials/checkout-navigation-step.tpl'
-            number="{l s='2' d='Shop.Theme.Checkout'}"
+            number=$stepNumber
             step="viragos-checkout-shipping-address-step"
             title="{l s='Shipping Address' d='Shop.Theme.Checkout'}"
           }
+          {$stepNumber = $stepNumber + 1}
         {/if}
 
         {include file='checkout/_partials/checkout-navigation-step.tpl'
-          number="{if $cart.is_virtual}{l s='2' d='Shop.Theme.Checkout'}{else}{l s='3' d='Shop.Theme.Checkout'}{/if}"
+          number=$stepNumber
           step="viragos-checkout-billing-address-step"
           title="{l s='Billing Address' d='Shop.Theme.Checkout'}"
         }
+        {$stepNumber = $stepNumber + 1}
 
         {if !$cart.is_virtual}
           {include file='checkout/_partials/checkout-navigation-step.tpl'
-            number="{l s='4' d='Shop.Theme.Checkout'}"
+            number=$stepNumber
             step="checkout-delivery-step"
             title="{l s='Shipping method' d='Shop.Theme.Checkout'}"
           }
+          {$stepNumber = $stepNumber + 1}
         {/if}
 
         {include file='checkout/_partials/checkout-navigation-step.tpl'
-          number="{if $cart.is_virtual}{l s='3' d='Shop.Theme.Checkout'}{else}{l s='5' d='Shop.Theme.Checkout'}{/if}"
+          number=$stepNumber
           step="checkout-payment-step"
           title="{l s='Payment' d='Shop.Theme.Checkout'}"
         }
@@ -54,11 +61,13 @@
       </div>
 
       <div class="{$componentName}__right">
-        {include file='checkout/_partials/checkout-navigation-step-mobile.tpl'
-          step="checkout-personal-information-step"
-          title="{l s='Personal Information' d='Shop.Theme.Checkout'}"
-          subtitle="{if $cart.is_virtual}{l s='Next: Billing Address' d='Shop.Theme.Checkout'}{else}{l s='Next: Shipping Address' d='Shop.Theme.Checkout'}{/if}"
-        }
+        {if !$viragos_skip_guest_personal_information}
+          {include file='checkout/_partials/checkout-navigation-step-mobile.tpl'
+            step="checkout-personal-information-step"
+            title="{l s='Personal Information' d='Shop.Theme.Checkout'}"
+            subtitle="{if $cart.is_virtual}{l s='Next: Billing Address' d='Shop.Theme.Checkout'}{else}{l s='Next: Shipping Address' d='Shop.Theme.Checkout'}{/if}"
+          }
+        {/if}
 
         {if !$cart.is_virtual}
           {include file='checkout/_partials/checkout-navigation-step-mobile.tpl'

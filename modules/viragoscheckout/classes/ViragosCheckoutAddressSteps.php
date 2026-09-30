@@ -89,14 +89,33 @@ abstract class ViragosCheckoutAddressStep extends AbstractCheckoutStep
 class ViragosCheckoutShippingAddressStep extends ViragosCheckoutAddressStep
 {
     protected $template = 'module:viragoscheckout/views/templates/front/checkout/shipping-address.tpl';
+    private $customerForm;
+    private $loginForm;
+    private $collectGuestIdentity;
+    private $showLoginForm = false;
 
-    public function __construct(Context $context, TranslatorInterface $translator, CustomerAddressForm $addressForm)
-    {
+    public function __construct(
+        Context $context,
+        TranslatorInterface $translator,
+        CustomerAddressForm $addressForm,
+        ?CustomerForm $customerForm = null,
+        ?CustomerLoginForm $loginForm = null,
+        bool $collectGuestIdentity = false
+    ) {
         parent::__construct($context, $translator, $addressForm, 'delivery');
+        $this->customerForm = $customerForm;
+        $this->loginForm = $loginForm;
+        $this->collectGuestIdentity = $collectGuestIdentity;
     }
 
     public function handleRequest(array $requestParameters = [])
     {
+        $this->setTitle($this->getTranslator()->trans('Shipping Address', [], 'Shop.Theme.Checkout'));
+
+        if ($this->handleGuestIdentity($requestParameters)) {
+            return $this;
+        }
+
         $this->prepareAddressForm($requestParameters);
         if ($this->getCheckoutProcess()->hasErrors()) {
             return $this;
@@ -121,9 +140,59 @@ class ViragosCheckoutShippingAddressStep extends ViragosCheckoutAddressStep
             $this->setCurrent(true);
         }
 
-        $this->setTitle($this->getTranslator()->trans('Shipping Address', [], 'Shop.Theme.Checkout'));
-
         return $this;
+    }
+
+    private function handleGuestIdentity(array $requestParameters): bool
+    {
+        $customer = $this->getCheckoutSession()->getCustomer();
+        if (!$this->collectGuestIdentity || $customer->id || !$this->customerForm || !$this->loginForm) {
+            return false;
+        }
+
+        $this->customerForm
+            ->setAction($this->getCheckoutSession()->getCheckoutURL())
+            ->fillFromCustomer($customer);
+        $this->loginForm->setAction($this->getCheckoutSession()->getCheckoutURL());
+
+        if (isset($requestParameters['submitCreate'])) {
+            $this->customerForm->fillWith($requestParameters);
+            $hookResult = array_reduce(
+                Hook::exec('actionSubmitAccountBefore', [], null, true),
+                function ($carry, $item) {
+                    return $carry && $item;
+                },
+                true
+            );
+
+            if (!$hookResult || !$this->customerForm->submit()) {
+                $this->setCurrent(true);
+                $this->getCheckoutProcess()->setHasErrors(true);
+            } else {
+                $this->setCurrent(true);
+            }
+
+            return true;
+        }
+
+        if (isset($requestParameters['submitLogin'])) {
+            $this->loginForm->fillWith($requestParameters);
+            if (!$this->loginForm->submit()) {
+                $this->showLoginForm = true;
+                $this->getCheckoutProcess()->setHasErrors(true);
+            }
+            $this->setCurrent(true);
+
+            return true;
+        }
+
+        if (array_key_exists('login', $requestParameters)) {
+            $this->showLoginForm = true;
+        }
+
+        $this->setCurrent(true);
+
+        return true;
     }
 
     protected function setSelectedAddress(int $addressId): void
@@ -133,7 +202,16 @@ class ViragosCheckoutShippingAddressStep extends ViragosCheckoutAddressStep
 
     public function render(array $extraParams = [])
     {
-        return $this->renderAddressStep($extraParams);
+        $customer = $this->getCheckoutSession()->getCustomer();
+
+        return $this->renderAddressStep(array_merge($extraParams, [
+            'identity_required' => $this->collectGuestIdentity && !$customer->id,
+            'customer_form' => $this->customerForm ? $this->customerForm->getProxy() : null,
+            'login_form' => $this->loginForm ? $this->loginForm->getProxy() : null,
+            'show_login_form' => $this->showLoginForm,
+            'guest_allowed' => (bool) Configuration::get('PS_GUEST_CHECKOUT_ENABLED'),
+            'has_personal_information_step' => !$this->collectGuestIdentity,
+        ]));
     }
 }
 
@@ -214,7 +292,9 @@ class ViragosCheckoutBillingAddressStep extends ViragosCheckoutAddressStep
             $this->setNextStepAsCurrent();
         } elseif (!$this->getCheckoutSession()->getIdAddressInvoice()) {
             $this->setComplete(false);
-            $this->setCurrent(true);
+            if ($this->isReachable()) {
+                $this->setCurrent(true);
+            }
             if ($this->getCheckoutSession()->getCustomerAddressesCount() === 0) {
                 $this->showAddressForm = true;
             }

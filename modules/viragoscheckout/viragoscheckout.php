@@ -41,28 +41,46 @@ class ViragosCheckout extends Module
         /** @var CheckoutProcess $process */
         $process = $params['checkoutProcess'];
         $translator = $this->context->getTranslator();
+        $isVirtualCart = $this->context->cart->isVirtualCart();
+        $guestCheckoutAllowed = (bool) Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
+        $skipGuestPersonalInformation = !$isVirtualCart
+            && $guestCheckoutAllowed
+            && (!$this->context->customer->isLogged() || $this->context->customer->is_guest);
+
+        $this->context->smarty->assign(
+            'viragos_skip_guest_personal_information',
+            $skipGuestPersonalInformation
+        );
+
         $steps = [];
         $replacedAddressStep = false;
 
         foreach ($process->getSteps() as $step) {
+            if ($skipGuestPersonalInformation && $step instanceof CheckoutPersonalInformationStep) {
+                continue;
+            }
+
             if (!$step instanceof CheckoutAddressesStep) {
                 $steps[] = $step;
                 continue;
             }
 
             $replacedAddressStep = true;
-            if (!$this->context->cart->isVirtualCart()) {
+            if (!$isVirtualCart) {
                 $steps[] = new ViragosCheckoutShippingAddressStep(
                     $this->context,
                     $translator,
-                    $this->makeAddressForm($translator)
+                    $this->makeAddressForm($translator),
+                    $skipGuestPersonalInformation ? $this->makeCustomerForm($translator) : null,
+                    $skipGuestPersonalInformation ? $this->makeCustomerLoginForm($translator) : null,
+                    $skipGuestPersonalInformation
                 );
             }
             $steps[] = new ViragosCheckoutBillingAddressStep(
                 $this->context,
                 $translator,
                 $this->makeAddressForm($translator),
-                !$this->context->cart->isVirtualCart()
+                !$isVirtualCart
             );
         }
 
@@ -98,6 +116,50 @@ class ViragosCheckout extends Module
                 $translator,
                 $availableCountries
             )
+        );
+
+        return $form->setAction($this->context->link->getPageLink('order'));
+    }
+
+    private function makeCustomerForm($translator): CustomerForm
+    {
+        $guestAllowed = (bool) Configuration::get('PS_GUEST_CHECKOUT_ENABLED');
+        $controller = $this->context->controller;
+        $customer = new Customer();
+        $formatter = new CustomerFormatter($translator, $this->context->language);
+        $formatter
+            ->setAskForPartnerOptin(Configuration::get('PS_CUSTOMER_OPTIN'))
+            ->setAskForBirthdate(Configuration::get('PS_CUSTOMER_BIRTHDATE'))
+            ->setPartnerOptinRequired($customer->isFieldRequired('optin'));
+
+        $form = new CustomerForm(
+            $this->context->smarty,
+            $this->context,
+            $translator,
+            $formatter,
+            new CustomerPersister(
+                $this->context,
+                $controller->get('hashing'),
+                $translator,
+                $guestAllowed
+            ),
+            $controller->getTemplateVarUrls()
+        );
+
+        return $form
+            ->setGuestAllowed($guestAllowed)
+            ->setAction($this->context->link->getPageLink('order'));
+    }
+
+    private function makeCustomerLoginForm($translator): CustomerLoginForm
+    {
+        $controller = $this->context->controller;
+        $form = new CustomerLoginForm(
+            $this->context->smarty,
+            $this->context,
+            $translator,
+            new CustomerLoginFormatter($translator),
+            $controller->getTemplateVarUrls()
         );
 
         return $form->setAction($this->context->link->getPageLink('order'));
