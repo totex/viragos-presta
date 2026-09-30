@@ -1,6 +1,20 @@
 /*
 
+!/modules/
+/modules/*
 !/modules/shippingvillages/
+/modules/shippingvillages/index.php
+/modules/shippingvillages/classes/index.php
+/modules/shippingvillages/controllers/index.php
+/modules/shippingvillages/controllers/admin/index.php
+!/modules/viragoscheckout/
+!/modules/viragoscheckout/**
 
+!/themes/
+/themes/*
 !/themes/flowershop/
+!/themes/flowershop/**
+/themes/flowershop/assets/cache/
+/themes/flowershop/config/index.php
+/themes/flowershop/index.php
 

@@ -188,9 +188,13 @@ class ShippingVillages extends Module
             @$this->context->smarty->registerClass('ShippingVillage', 'ShippingVillage');
         }
 
+        $script = $this->context->shop->theme->getName() === 'flowershop'
+            ? 'checkout-village-postcode.js'
+            : 'checkout-villages.js';
+
         $this->context->controller->registerJavascript(
             'module-shippingvillages-checkout',
-            'modules/' . $this->name . '/views/js/checkout-villages.js',
+            'modules/' . $this->name . '/views/js/' . $script,
             [
                 'position' => 'bottom',
                 'priority' => 150,
